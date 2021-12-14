@@ -1,12 +1,12 @@
-package com.hooyu.exercise.customers.dao;
+package com.hooyu.exercise.search.dao;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 @ResponseStatus(HttpStatus.NOT_FOUND)
-public class CustomerNotFoundException extends RuntimeException {
+public class RecordNotFoundException extends RuntimeException{
 
-	public CustomerNotFoundException(String message) {
+	public RecordNotFoundException(String message) {
 		super(message);
 	}
 }

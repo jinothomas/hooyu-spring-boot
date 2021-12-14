@@ -1,4 +1,4 @@
-package com.hooyu.exercise.dto;
+package com.hooyu.exercise.signin.dto;
 
 public class SignInRequest {
 	private String email;

@@ -1,6 +1,6 @@
-package com.hooyu.exercise.dto;
+package com.hooyu.exercise.search.dto;
 
-public class SearchResults {
+public class SearchResultsResponse {
 	private String name;
 	private String telephone;
 	private String address;

@@ -1,6 +1,6 @@
-package com.hooyu.exercise.dto;
+package com.hooyu.exercise.search.dto;
 
-public class SearchInputs {
+public class SearchInputRequest {
 	
 	private String surname;
 	private String postcode;
