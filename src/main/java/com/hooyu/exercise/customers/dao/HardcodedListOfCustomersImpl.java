@@ -1,17 +1,21 @@
 package com.hooyu.exercise.customers.dao;
 
-import com.hooyu.exercise.customers.domain.Customer;
-import com.hooyu.exercise.customers.domain.CustomerType;
-
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Component;
+
+import com.hooyu.exercise.customers.domain.Customer;
+import com.hooyu.exercise.customers.domain.CustomerType;
 
 @Component
 public class HardcodedListOfCustomersImpl implements CustomerDao {
 
 	private static Map<String,Customer> customers = new HashMap<>();
+	
+	private static Log logger = LogFactory.getLog(HardcodedListOfCustomersImpl.class);
 	
 	public HardcodedListOfCustomersImpl() {
 		customers.put("john.doe@192.com", createDummyCustomer("john.doe@192.com", "John", "Doe", CustomerType.PREMIUM));
@@ -20,9 +24,12 @@ public class HardcodedListOfCustomersImpl implements CustomerDao {
 	}
 	
 	public Customer findCustomerByEmailAddress(String email) throws CustomerNotFoundException {
+		logger.info("Inside findCustomerByEmailAddress, email:"+email);
 		Customer customer = customers.get(email);
 		if(customer == null) {
+			logger.error("Invalid customer" );
 			throw new CustomerNotFoundException("Invalid customer");
+			
 		}	
 		return customer;
 	}
@@ -38,6 +45,7 @@ public class HardcodedListOfCustomersImpl implements CustomerDao {
 
 	@Override
 	public boolean isCustomerPresent(String userEmail) {
+		logger.info("Inside isCustomerPresent, email:"+userEmail);
 		return customers.containsKey(userEmail);
 	}
 }

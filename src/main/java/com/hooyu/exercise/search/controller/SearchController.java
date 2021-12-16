@@ -7,6 +7,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.servlet.http.HttpSession;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +18,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -22,6 +25,7 @@ import org.springframework.web.context.request.WebRequest;
 
 import com.hooyu.exercise.SearchRequest;
 import com.hooyu.exercise.customers.dao.CustomerNotFoundException;
+import com.hooyu.exercise.customers.dao.UnauthorizedUserException;
 import com.hooyu.exercise.customers.domain.Customer;
 import com.hooyu.exercise.customers.domain.CustomerType;
 import com.hooyu.exercise.search.dao.RecordNotFoundException;
@@ -41,68 +45,99 @@ import net.icdpublishing.exercise2.searchengine.services.SearchEngineRetrievalSe
 
 @Controller
 public class SearchController {
-	
+
 	@Autowired
 	private CustomerService customerService;
 
 	private SearchEngineRetrievalService retrievalService = new DummyRetrievalServiceImpl(new DataLoader());
-	
+
 	private ChargingService chargingService = new ImaginaryChargingService();
+
+	private static final String EMPTY_STRING = "";
+
+	private static final String SEARCH = "search";
+
+	private static final String CUSTOMER = "customer";
+
+	private static final String SURNAME = "surname";
+
+	private static final String POSTCODE = "postcode";
+
+	private static final String EMAIL = "email";
 	
-	private static String EMPTY_STRING ="";
-	
-	private static String SEARCH ="search";
+	private static Log logger = LogFactory.getLog(SearchController.class);
 
 	@RequestMapping("/search")
-	public String search() {
+	public String search(HttpSession httpSession) throws Exception {
+
+		// Checks whether the user is authenticated to do the action
+		validateUser(httpSession);
 		return SEARCH;
 	}
-	
+
 	/*
-	 * The method is the mapping for search functionality for HTML Page.
-	 * Response is modified to be more suitable for UI manipulation.
-	 * */
+	 * The method is the mapping for search functionality for HTML Page. Response is
+	 * modified to be more suitable for UI manipulation.
+	 */
 	@RequestMapping(value = "/search", method = RequestMethod.POST)
-	public String searchUser(SearchInputRequest searchInputs, Model model) throws CustomerNotFoundException {
+	public String searchUser(SearchInputRequest searchInputs, Model model, HttpSession session)
+			throws UnauthorizedUserException {
+		logger.info("Reached searchUser Method");
+
+		// Checks whether the user is authenticated to do the action
+		Customer customer = validateUser(session);
+
 		SimpleSurnameAndPostcodeQuery query = new SimpleSurnameAndPostcodeQuery(searchInputs.getSurname(),
 				searchInputs.getPostcode());
-		Customer customer = customerService.findCustomerByEmailAddress(searchInputs.getEmail());
+
+		logger.info("Customer record found: " + customer);
 		SearchRequest searchRequest = new SearchRequest(query, customer);
 		Collection<Record> records = handleRequest(searchRequest);
+
 		if (!CollectionUtils.isEmpty(records)) {
 			model.addAttribute("records", mapSearchResults(records));
+			logger.info("Records are fetched successfully");
 		} else {
-			model.addAttribute( "error", new RecordNotFoundException("Record not Found"));
-		} 
+			model.addAttribute("error", new RecordNotFoundException("Record not Found"));
+			logger.error("No Valid Records found for the given inputs:",
+					new RecordNotFoundException("Record not Found"));
+		}
 		model.addAttribute("emailAddress", customer.getEmailAddress());
-		model.addAttribute("customerType",customer.getCustomType().name());
+		model.addAttribute("customerType", customer.getCustomType().name());
+		logger.info("Returns Search Page");
 		return SEARCH;
 	}
-	
+
 	/*
-	 * The method is the mapping for search functionality for JSON Response.
-	 * Actual Response from search engine is returned.
-	 * */
-	@RequestMapping(value="/search", method = RequestMethod.GET)
-	public ResponseEntity<?> fetchSearchResults(@RequestHeader("email") String email, @RequestHeader("surname") String surname,
-			@RequestHeader("postcode") String postcode) throws CustomerNotFoundException {
+	 * The method is the mapping for search functionality for JSON Response. Actual
+	 * Response from search engine is returned.
+	 */
+	@RequestMapping(value = "/search", method = RequestMethod.GET)
+	public ResponseEntity<?> fetchSearchResults(@RequestHeader(CUSTOMER) String email,
+			@RequestHeader(SURNAME) String surname, @RequestHeader(POSTCODE) String postcode)
+			throws CustomerNotFoundException {
+		logger.info("Reached fetchSearchResults Method");
 		SimpleSurnameAndPostcodeQuery query = new SimpleSurnameAndPostcodeQuery(surname, postcode);
+
 		Customer customer = customerService.findCustomerByEmailAddress(email);
+		logger.info("Customer record found: " + customer);
 		SearchRequest searchRequest = new SearchRequest(query, customer);
 		Collection<Record> searchResponse = handleRequest(searchRequest);
-		
+
 		if (CollectionUtils.isEmpty(searchResponse)) {
+			logger.error("No Valid Records found for the given inputs:",
+					new RecordNotFoundException("Record not Found"));
 			throw new RecordNotFoundException("Record not Found");
 		} else {
 			return new ResponseEntity<>(searchResponse, HttpStatus.OK);
 		}
-		
+
 	}
-	
-	
+
 	/*
-	 * The method is to filter BT records only for Non-paying customers and also to exclude BT from charging
-	 * */
+	 * The method is to filter BT records only for Non-paying customers and also to
+	 * exclude BT from charging
+	 */
 	public Collection<Record> handleRequest(SearchRequest request) {
 		Collection<Record> resultSet = getResults(request.getQuery());
 		Collection<Record> bTResultSet = resultSet.stream()
@@ -121,13 +156,14 @@ public class SearchController {
 
 		return resultSet;
 	}
-	
+
 	/*
-	 * The method is to map the results to SearchResultsResponse to send to the Front-end
-	 * **/
+	 * The method is to map the results to SearchResultsResponse to send to the
+	 * Front-end
+	 **/
 	private Set<SearchResultsResponse> mapSearchResults(Collection<Record> resultSet) {
 		Set<SearchResultsResponse> searchResultsList = new HashSet<>();
-		resultSet.forEach((record)->{
+		resultSet.forEach((record) -> {
 			SearchResultsResponse result = new SearchResultsResponse();
 			if (record.getPerson() != null && record.getPerson().getAddress() != null) {
 
@@ -147,7 +183,8 @@ public class SearchController {
 				result.setAddress(address.toString());
 
 				// Setting Telephone
-				String telephone = record.getPerson().getTelephone() != null ? record.getPerson().getTelephone(): EMPTY_STRING;
+				String telephone = record.getPerson().getTelephone() != null ? record.getPerson().getTelephone()
+						: EMPTY_STRING;
 				result.setTelephone(telephone);
 
 				// Setting Source types
@@ -164,27 +201,47 @@ public class SearchController {
 				result.setSourceTypes(sourceTypes.toString());
 
 			}
-			
+
 			searchResultsList.add(result);
 		});
 		return searchResultsList;
 	}
-	
+
 	/*
 	 * This method is to call the search service
-	 * */
+	 */
 	private Collection<Record> getResults(SimpleSurnameAndPostcodeQuery query) {
 		return retrievalService.search(query);
 	}
-	
+
+	/*
+	 * The method recordNotFoundExceptionHandler is for handling the
+	 * RecordNotFoundException
+	 */
 	@ExceptionHandler(RecordNotFoundException.class)
-	private ResponseEntity<ErrorResponse> recordNotFoundExceptionHandler(RecordNotFoundException exception, WebRequest request) {
+	private ResponseEntity<ErrorResponse> recordNotFoundExceptionHandler(RecordNotFoundException exception,
+			WebRequest request) {
 		List<String> details = new ArrayList<>();
-		details.add("Email:" + request.getHeader("email"));
-		details.add("Postcode:" + request.getHeader("postcode"));
-		details.add("Surname:" + request.getHeader("surname"));
+		details.add("Email:" + request.getHeader(EMAIL));
+		details.add("Postcode:" + request.getHeader(POSTCODE));
+		details.add("Surname:" + request.getHeader(SURNAME));
 		ErrorResponse errorResponse = new ErrorResponse(exception.getLocalizedMessage(), details);
 		return new ResponseEntity<ErrorResponse>(errorResponse, HttpStatus.NOT_FOUND);
 	}
-	
+
+	/*
+	 * The method compares the session that is coming from the UI and saved in the
+	 * back-end. Returns the customer data if the session is valid
+	 * 
+	 */
+	private Customer validateUser(HttpSession httpSession) throws UnauthorizedUserException {
+
+		Customer customer = (Customer) httpSession.getAttribute(CUSTOMER);
+		if (customer == null) {
+			throw new UnauthorizedUserException(
+					"The user is unauthorized to perform the operation, Sign in to continue");
+		}
+		return customer;
+
+	}
 }
