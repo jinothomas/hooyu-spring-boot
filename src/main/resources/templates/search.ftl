@@ -1,6 +1,8 @@
 <link href="/css/bootstrap.min.css" rel="stylesheet">
 <#if emailAddress?? >
-<div class="col-lg-8">Welcome, <b><i>${emailAddress}</i></b>  Customer Type: <b>${customerType}</b><br></div>
+<form method="get" action="/signOut">
+	</br><div class="col-lg-8">Welcome, <b><i>${emailAddress}</i></b>&nbsp Customer Type: <b>${customerType}</b>&nbsp<button type="submit" class="btn btn-primary">Sign out</button><br></div>
+</form>
 <form method="post" action="/search">
 <div class="col-lg-12">
     <div class="col-lg-4">
@@ -9,7 +11,7 @@
     <div class="col-lg-4">
     	<label>Enter Postcode</label> <input type="text"  class="form-control" name="postcode" placeholder="Postcode"/>
 	</div>    	
-    <input type="hidden"  class="form-control" name="email" value =  ${emailAddress}>
+    <input type="hidden"  class="form-control" name="email" value =  ${emailAddress}></br>
     <div class="col-lg-2">
     <button type="submit" class="btn btn-primary">Search</button>
     </div>
@@ -37,5 +39,5 @@
 </table>
 </div>
 <#elseif error??>
-	NO RECORDS AVAILABLE!
+	<b>NO RECORDS AVAILABLE!</b>
  </#if>

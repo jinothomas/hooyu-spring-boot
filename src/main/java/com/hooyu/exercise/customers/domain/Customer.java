@@ -10,6 +10,7 @@ public class Customer {
 	private String surname;
 	private String emailAddress;
 	private CustomerType customerType;
+	private Integer totalCredits;
 	
 	public String getForename() {
 		return forename;
@@ -56,5 +57,13 @@ public class Customer {
 	@Override
 	public String toString() {
 		return ToStringBuilder.reflectionToString(this);
+	}
+
+	public Integer getTotalCredits() {
+		return totalCredits;
+	}
+
+	public void setTotalCredits(Integer totalCredits) {
+		this.totalCredits = totalCredits;
 	}
 }

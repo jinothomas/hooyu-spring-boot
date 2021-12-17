@@ -40,6 +40,7 @@ public class HardcodedListOfCustomersImpl implements CustomerDao {
 		c.setForename(forename);
 		c.setSurname(surname);
 		c.setCustomType(type);
+		c.setTotalCredits(192); // A new field is added and set 192
 		return c;
 	}
 

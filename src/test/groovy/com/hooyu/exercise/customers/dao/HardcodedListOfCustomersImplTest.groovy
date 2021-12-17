@@ -34,6 +34,24 @@ class HardcodedListOfCustomersImplTest extends Specification {
 		expectedCustomer.setForename("John");
 		expectedCustomer.setSurname("Doe");
 		expectedCustomer.setCustomType(CustomerType.PREMIUM);
+		expectedCustomer.setTotalCredits(192);
 		return expectedCustomer;
+	}
+	
+	def "should return true"() {
+		when:
+			def ispresent = customerImpl.isCustomerPresent("john.doe@192.com")
+		
+		then:
+			ispresent == true
+	}
+	
+	def "should return a false"() {
+		when:
+			
+			def ispresent = customerImpl.isCustomerPresent("john.test@192.com")
+
+		then:
+			ispresent == false
 	}
 }

@@ -35,6 +35,10 @@ public class SignInController {
 		return SIGN_IN;
 	}
 
+	public SignInController(CustomerService customerService) {
+	    this.customerService = customerService;
+	  }
+	
 	private static Log logger = LogFactory.getLog(SignInController.class);
 
 	/*
@@ -46,7 +50,6 @@ public class SignInController {
 	public String authenticate(SignInRequest signInRequest, HttpSession session, Model model) {
 
 		try {
-
 			Customer customer = customerService.findCustomerByEmailAddress(signInRequest.getEmail());
 			session.setAttribute("customer", customer);
 		

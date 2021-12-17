@@ -35,7 +35,6 @@ import com.hooyu.exercise.service.CustomerService;
 import com.hooyu.exercise.shared.dao.ErrorResponse;
 
 import net.icdpublishing.exercise2.myapp.charging.services.ChargingService;
-import net.icdpublishing.exercise2.myapp.charging.services.ImaginaryChargingService;
 import net.icdpublishing.exercise2.searchengine.domain.Record;
 import net.icdpublishing.exercise2.searchengine.domain.SourceType;
 import net.icdpublishing.exercise2.searchengine.loader.DataLoader;
@@ -51,7 +50,8 @@ public class SearchController {
 
 	private SearchEngineRetrievalService retrievalService = new DummyRetrievalServiceImpl(new DataLoader());
 
-	private ChargingService chargingService = new ImaginaryChargingService();
+	@Autowired
+	private ChargingService chargingService;
 
 	private static final String EMPTY_STRING = "";
 
@@ -66,6 +66,11 @@ public class SearchController {
 	private static final String EMAIL = "email";
 	
 	private static Log logger = LogFactory.getLog(SearchController.class);
+	
+	public SearchController(CustomerService customerService, ChargingService chargingService) {
+	    this.customerService = customerService;
+	    this.chargingService = chargingService;
+	  }
 
 	@RequestMapping("/search")
 	public String search(HttpSession httpSession) throws Exception {
@@ -82,9 +87,9 @@ public class SearchController {
 	@RequestMapping(value = "/search", method = RequestMethod.POST)
 	public String searchUser(SearchInputRequest searchInputs, Model model, HttpSession session)
 			throws UnauthorizedUserException {
+		
 		logger.info("Reached searchUser Method");
-
-		// Checks whether the user is authenticated to do the action
+		// Checks whether the user is authorized to do the action
 		Customer customer = validateUser(session);
 
 		SimpleSurnameAndPostcodeQuery query = new SimpleSurnameAndPostcodeQuery(searchInputs.getSurname(),
@@ -113,20 +118,24 @@ public class SearchController {
 	 * Response from search engine is returned.
 	 */
 	@RequestMapping(value = "/search", method = RequestMethod.GET)
-	public ResponseEntity<?> fetchSearchResults(@RequestHeader(CUSTOMER) String email,
+	public ResponseEntity<?> fetchSearchResults(@RequestHeader(EMAIL) String email,
 			@RequestHeader(SURNAME) String surname, @RequestHeader(POSTCODE) String postcode)
 			throws CustomerNotFoundException {
+		
 		logger.info("Reached fetchSearchResults Method");
 		SimpleSurnameAndPostcodeQuery query = new SimpleSurnameAndPostcodeQuery(surname, postcode);
 
 		Customer customer = customerService.findCustomerByEmailAddress(email);
+		if(customer == null) {
+			logger.info("Customer record found: " + customer);
+			throw new CustomerNotFoundException("Customer record found: " + customer);
+		}
 		logger.info("Customer record found: " + customer);
 		SearchRequest searchRequest = new SearchRequest(query, customer);
 		Collection<Record> searchResponse = handleRequest(searchRequest);
 
 		if (CollectionUtils.isEmpty(searchResponse)) {
-			logger.error("No Valid Records found for the given inputs:",
-					new RecordNotFoundException("Record not Found"));
+			logger.error("No Valid Records found for the given inputs:", new RecordNotFoundException("Record not Found"));
 			throw new RecordNotFoundException("Record not Found");
 		} else {
 			return new ResponseEntity<>(searchResponse, HttpStatus.OK);
@@ -139,18 +148,24 @@ public class SearchController {
 	 * exclude BT from charging
 	 */
 	public Collection<Record> handleRequest(SearchRequest request) {
+		logger.info("Inside method handleRequest() : Mapping results for UI");
 		Collection<Record> resultSet = getResults(request.getQuery());
+		
+		//Exclusive BT records are Identified
 		Collection<Record> bTResultSet = resultSet.stream()
 				.filter(result -> result.getSourceTypes().size() == 1
 						&& result.getSourceTypes().stream().findFirst().get().equals(SourceType.BT))
 				.collect(Collectors.toList());
+		
 		if (request.getCustomer().getCustomType().equals(CustomerType.NON_PAYING)) {
 			resultSet = bTResultSet;
+			logger.info("Credit is not charged as the user is Non Paying, No.of Records: "+resultSet.size());
 		}
 		if (request.getCustomer().getCustomType().equals(CustomerType.PREMIUM)) {
-
+			// BT Records are excluded
 			int numberOfCredits = resultSet.size() - bTResultSet.size();
-
+			
+			logger.info("Calling chargingService, No.of records: "+resultSet.size());
 			chargingService.charge(request.getCustomer().getEmailAddress(), numberOfCredits);
 		}
 
@@ -183,8 +198,7 @@ public class SearchController {
 				result.setAddress(address.toString());
 
 				// Setting Telephone
-				String telephone = record.getPerson().getTelephone() != null ? record.getPerson().getTelephone()
-						: EMPTY_STRING;
+				String telephone = record.getPerson().getTelephone() != null ? record.getPerson().getTelephone(): EMPTY_STRING;
 				result.setTelephone(telephone);
 
 				// Setting Source types
